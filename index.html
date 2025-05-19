@@ -22,6 +22,7 @@
       margin: 0.5rem 0;
       padding: 0.6rem;
       font-size: 1rem;
+      box-sizing: border-box;
     }
     table {
       width: 100%;
@@ -48,8 +49,12 @@
       cursor: pointer;
       border-radius: 6px;
     }
-    button:hover {
+    button:hover:not(:disabled) {
       background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #999;
+      cursor: default;
     }
     @media (min-width: 768px) {
       input[type="range"] {
@@ -93,7 +98,8 @@
   <div id="section-lecture" style="display:none;">
     <h2>🔊 Lecture des annonces</h2>
     <p id="etat-lecture">Sélectionne des matchs.</p>
-    <button onclick="lireMatchsSelectionnes()">▶️ Lire les annonces</button>
+    <button id="btn-parler" onclick="lireMatchsSelectionnes()">▶️ Parler</button>
+    <button onclick="arreterLecture()">⛔ Arrêter</button>
   </div>
 
   <script>
@@ -137,7 +143,6 @@
         window.removeEventListener("click", activerVoixIOS);
       }
     }
-
     window.addEventListener("click", activerVoixIOS);
 
     // Charger voix au démarrage (pour non iOS)
@@ -179,6 +184,9 @@
 
     function arreterLecture() {
       speechSynthesis.cancel();
+      btnParler.disabled = false;
+      btnParler.textContent = "▶️ Parler";
+      document.getElementById("etat-lecture").innerText = "⏹️ Lecture arrêtée.";
     }
 
     function importerExcel(event) {
@@ -243,18 +251,24 @@
       return `Prochain match : ${match.equipe_dom} affrontera ${match.equipe_ext} le ${match.date} à ${match.heure}, au ${match.lieu}. Venez nombreux !`;
     }
 
+    const btnParler = document.getElementById("btn-parler");
+
     function lireMatchsSelectionnes() {
-      const selection = matchs.filter((m) => m.selected);
+      const selection = matchs.filter(m => m.selected);
       if (selection.length === 0) {
         alert("Aucun match sélectionné !");
         return;
       }
+      btnParler.disabled = true;
+      btnParler.textContent = "🔊 En cours...";
       lireEnBoucle(selection, 0);
     }
 
     function lireEnBoucle(liste, index) {
       if (index >= liste.length) {
         document.getElementById("etat-lecture").innerText = "✅ Lecture terminée.";
+        btnParler.disabled = false;
+        btnParler.textContent = "▶️ Parler";
         return;
       }
       const texte = genererAnnonce(liste[index]);
