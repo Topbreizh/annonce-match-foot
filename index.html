@@ -87,7 +87,7 @@
     <thead>
       <tr>
         <th>Sélect</th><th>Domicile</th><th>Extérieur</th>
-        <th>Date</th><th>Heure</th><th>Lieu</th>
+        <th>Date</th><th>Heure</th><th>Lieu</th><th>Action</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -230,6 +230,7 @@
           <td>${match.date}</td>
           <td>${match.heure}</td>
           <td>${match.lieu}</td>
+          <td><button onclick="lireMatch(${index})">Lire</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -273,8 +274,21 @@
       }
       const texte = genererAnnonce(liste[index]);
       document.getElementById("etat-lecture").innerText = `Lecture ${index + 1} sur ${liste.length}`;
-      lireTexte(texte, () => lireEnBoucle(liste, index + 1));
+      lireTexte(texte, () => {
+        lireEnBoucle(liste, index + 1);
+      });
+    }
+
+    function lireMatch(index) {
+      const match = matchs[index];
+      if (!match) return;
+      speechSynthesis.cancel(); // stop toute lecture en cours
+      document.getElementById("etat-lecture").innerText = `Lecture du match : ${match.equipe_dom} vs ${match.equipe_ext}`;
+      lireTexte(genererAnnonce(match), () => {
+        document.getElementById("etat-lecture").innerText = "✅ Lecture terminée.";
+      });
     }
   </script>
+
 </body>
 </html>
