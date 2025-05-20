@@ -2,293 +2,219 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Annonce Matchs - Mobile</title>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Annonce de Matchs</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
+      font-family: sans-serif;
       padding: 1rem;
-      background: #f4f4f4;
-      color: #333;
-    }
-    h1, h2, h3 {
-      text-align: center;
-      color: #111;
-    }
-    input[type="file"], select, button, input[type="range"] {
-      width: 100%;
-      margin: 0.5rem 0;
-      padding: 0.6rem;
-      font-size: 1rem;
-      box-sizing: border-box;
+      background: #f9f9f9;
     }
     table {
       width: 100%;
-      margin-top: 1rem;
       border-collapse: collapse;
+      margin-top: 1rem;
     }
     th, td {
-      border: 1px solid #ddd;
-      padding: 0.6rem;
-      font-size: 0.95rem;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
       text-align: center;
     }
-    #section-lecture {
-      background: #fff;
-      padding: 1rem;
-      margin-top: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    th {
+      background: #333;
+      color: white;
     }
     button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      margin: 0.2rem;
     }
-    button:hover:not(:disabled) {
-      background-color: #0056b3;
+    #etat-lecture {
+      margin-top: 1rem;
+      font-weight: bold;
     }
-    button:disabled {
-      background-color: #999;
-      cursor: default;
-    }
-    @media (min-width: 768px) {
-      input[type="range"] {
-        width: 60%;
+    @media (max-width: 600px) {
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+      tr {
+        margin-bottom: 1rem;
+        border: 1px solid #ccc;
+        padding: 0.5rem;
+      }
+      td {
+        text-align: right;
+        position: relative;
+        padding-left: 50%;
+      }
+      td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 0;
+        width: 50%;
+        padding-left: 0.5rem;
+        font-weight: bold;
+        text-align: left;
+      }
+      th {
+        display: none;
       }
     }
   </style>
 </head>
 <body>
+  <h1>Annonce de Matchs</h1>
 
-  <h1>📢 Annonces de Matchs</h1>
-  <input type="file" accept=".xlsx,.csv" onchange="importerExcel(event)" />
+  <input type="file" accept=".xlsx, .xls" onchange="importerExcel(event)" />
+  <br/>
 
-  <h3>Voix et configuration</h3>
-  <select id="voiceSelect"></select>
-  <button onclick="testerVoix()">Tester la voix</button>
+  <label>Voix :
+    <select id="voiceSelect"></select>
+  </label>
+  <label>Volume :
+    <input type="range" id="volume" min="0" max="1" step="0.1" value="1" />
+  </label>
+  <label>Vitesse :
+    <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" />
+  </label>
+  <label>Hauteur :
+    <input type="range" id="pitch" min="0" max="2" step="0.1" value="1" />
+  </label>
+  <br/>
 
-  <label>🔊 Volume : <span id="volumeLabel">1</span></label>
-  <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1" />
+  <button onclick="parler()">Parler</button>
+  <button onclick="arreterLecture()">Arrêter</button>
 
-  <label>⚡ Vitesse : <span id="rateLabel">1</span></label>
-  <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1" />
+  <div id="etat-lecture">Aucun match en lecture</div>
 
-  <label>🎼 Hauteur : <span id="pitchLabel">1</span></label>
-  <input type="range" id="pitchSlider" min="0" max="2" step="0.1" value="1" />
-
-  <button onclick="arreterLecture()">⛔ Arrêter</button>
-
-  <table id="table-matchs" style="display:none;">
+  <table id="table-matchs">
     <thead>
       <tr>
-        <th>Sélect</th><th>Domicile</th><th>Extérieur</th>
-        <th>Date</th><th>Heure</th><th>Lieu</th><th>Action</th>
+        <th>Sélect</th>
+        <th>Domicile</th>
+        <th>Extérieur</th>
+        <th>Lieu</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
-  <button id="btn-suivant" style="display:none;" onclick="passerEtape()">➡️ Étape suivante</button>
-
-  <div id="section-lecture" style="display:none;">
-    <h2>🔊 Lecture des annonces</h2>
-    <p id="etat-lecture">Sélectionne des matchs.</p>
-    <button id="btn-parler" onclick="lireMatchsSelectionnes()">▶️ Parler</button>
-    <button onclick="arreterLecture()">⛔ Arrêter</button>
-  </div>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
-    let matchs = [], voixDisponibles = [], voixChoisie = null;
-
-    // Détecter iOS
-    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-    // Afficher alerte iOS
-    if (isiOS) {
-      alert("⚠️ Sur iPhone/iPad, la sélection de voix est limitée. La voix par défaut sera utilisée.");
-    }
+    let matchs = [];
+    let voixDisponibles = [];
+    let synth = window.speechSynthesis;
 
     function chargerVoix() {
-      voixDisponibles = speechSynthesis.getVoices().filter(v => v.lang.startsWith("fr"));
+      voixDisponibles = synth.getVoices();
       const select = document.getElementById("voiceSelect");
       select.innerHTML = "";
-      voixDisponibles.forEach((v, i) => {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.textContent = `${v.name} (${v.lang})`;
-        select.appendChild(opt);
-      });
-      const saved = localStorage.getItem("voiceIndex");
-      if (saved && voixDisponibles[saved]) {
-        select.value = saved;
-        voixChoisie = voixDisponibles[saved];
-      } else {
-        voixChoisie = voixDisponibles[0] || null;
-      }
-    }
-
-    // Sur iOS, forcer le chargement voix au premier clic
-    function activerVoixIOS() {
-      if (isiOS) {
-        speechSynthesis.cancel(); // reset
-        speechSynthesis.getVoices();
-        setTimeout(() => {
-          chargerVoix();
-        }, 500);
-        window.removeEventListener("click", activerVoixIOS);
-      }
-    }
-    window.addEventListener("click", activerVoixIOS);
-
-    // Charger voix au démarrage (pour non iOS)
-    if (!isiOS) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        setTimeout(chargerVoix, 500);
-      };
-      // tenter aussi un appel direct
-      setTimeout(chargerVoix, 500);
-    }
-
-    document.getElementById("voiceSelect").addEventListener("change", function () {
-      voixChoisie = voixDisponibles[this.value];
-      localStorage.setItem("voiceIndex", this.value);
-    });
-
-    ["volume", "rate", "pitch"].forEach((param) => {
-      document
-        .getElementById(param + "Slider")
-        .addEventListener("input", (e) => {
-          document.getElementById(param + "Label").innerText = e.target.value;
-        });
-    });
-
-    function lireTexte(texte, callback) {
-      const u = new SpeechSynthesisUtterance(texte);
-      u.lang = "fr-FR";
-      if (voixChoisie) u.voice = voixChoisie;
-      u.volume = parseFloat(document.getElementById("volumeSlider").value);
-      u.rate = parseFloat(document.getElementById("rateSlider").value);
-      u.pitch = parseFloat(document.getElementById("pitchSlider").value);
-      u.onend = callback;
-      speechSynthesis.speak(u);
-    }
-
-    function testerVoix() {
-      lireTexte("Ceci est un test avec la voix actuelle.", () => {});
-    }
-
-    function arreterLecture() {
-      speechSynthesis.cancel();
-      btnParler.disabled = false;
-      btnParler.textContent = "▶️ Parler";
-      document.getElementById("etat-lecture").innerText = "⏹️ Lecture arrêtée.";
-    }
-
-    function importerExcel(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: "array" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet);
-
-        matchs = json.map((m, i) => ({
-          id: i,
-          equipe_dom: m.equipe_dom,
-          equipe_ext: m.equipe_ext,
-          date: m.date,
-          heure: m.heure,
-          lieu: m.lieu,
-          texte_annonce: m.texte_annonce || "",
-          selected: false,
-        }));
-
-        afficherMatchs();
-        document.getElementById("btn-suivant").style.display = "block";
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    function afficherMatchs() {
-      const tbody = document.querySelector("#table-matchs tbody");
-      tbody.innerHTML = "";
-      document.getElementById("table-matchs").style.display = "table";
-
-      matchs.forEach((match, index) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td><input type="checkbox" onchange="toggleSelection(${index}, this.checked)"></td>
-          <td>${match.equipe_dom}</td>
-          <td>${match.equipe_ext}</td>
-          <td>${match.date}</td>
-          <td>${match.heure}</td>
-          <td>${match.lieu}</td>
-          <td><button onclick="lireMatch(${index})">Lire</button></td>
-        `;
-        tbody.appendChild(tr);
+      voixDisponibles.forEach((voice, i) => {
+        const option = document.createElement("option");
+        option.value = i;
+        option.textContent = `${voice.name} (${voice.lang})`;
+        select.appendChild(option);
       });
     }
-
-    function toggleSelection(index, checked) {
-      matchs[index].selected = checked;
-    }
-
-    function passerEtape() {
-      document.getElementById("section-lecture").style.display = "block";
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    chargerVoix();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = chargerVoix;
     }
 
     function genererAnnonce(match) {
       if (match.texte_annonce && match.texte_annonce.trim() !== "") {
         return match.texte_annonce;
       }
-      return `Prochain match : ${match.equipe_dom} affrontera ${match.equipe_ext} le ${match.date} à ${match.heure}, au ${match.lieu}. Venez nombreux !`;
+      return `Prochain match : ${match.equipe_dom} affrontera ${match.equipe_ext} au ${match.lieu}. Venez nombreux !`;
     }
 
-    const btnParler = document.getElementById("btn-parler");
+    function lireTexte(texte, callback) {
+      const utterance = new SpeechSynthesisUtterance(texte);
+      const voix = voixDisponibles[document.getElementById("voiceSelect").value];
+      if (voix) utterance.voice = voix;
+      utterance.volume = parseFloat(document.getElementById("volume").value);
+      utterance.rate = parseFloat(document.getElementById("rate").value);
+      utterance.pitch = parseFloat(document.getElementById("pitch").value);
+      utterance.onend = callback;
+      speechSynthesis.speak(utterance);
+    }
 
-    function lireMatchsSelectionnes() {
-      const selection = matchs.filter(m => m.selected);
+    function parler() {
+      const selection = matchs.filter(m => m.selectionne);
       if (selection.length === 0) {
-        alert("Aucun match sélectionné !");
+        alert("Aucun match sélectionné.");
         return;
       }
-      btnParler.disabled = true;
-      btnParler.textContent = "🔊 En cours...";
       lireEnBoucle(selection, 0);
     }
 
     function lireEnBoucle(liste, index) {
       if (index >= liste.length) {
         document.getElementById("etat-lecture").innerText = "✅ Lecture terminée.";
-        btnParler.disabled = false;
-        btnParler.textContent = "▶️ Parler";
         return;
       }
-      const texte = genererAnnonce(liste[index]);
-      document.getElementById("etat-lecture").innerText = `Lecture ${index + 1} sur ${liste.length}`;
-      lireTexte(texte, () => {
+      const match = liste[index];
+      document.getElementById("etat-lecture").innerText =
+        `Lecture du match : ${match.equipe_dom} vs ${match.equipe_ext}`;
+      lireTexte(genererAnnonce(match), () => {
         lireEnBoucle(liste, index + 1);
       });
+    }
+
+    function arreterLecture() {
+      speechSynthesis.cancel();
+      document.getElementById("etat-lecture").innerText = "Lecture arrêtée.";
+    }
+
+    function importerExcel(event) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const donnees = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        matchs = donnees.map((row) => ({
+          equipe_dom: row.equipe_dom || "",
+          equipe_ext: row.equipe_ext || "",
+          lieu: row.lieu || "",
+          texte_annonce: row.texte_annonce || "",
+          selectionne: false,
+        }));
+        afficherMatchs();
+      };
+      reader.readAsArrayBuffer(event.target.files[0]);
+    }
+
+    function afficherMatchs() {
+      const tbody = document.querySelector("#table-matchs tbody");
+      tbody.innerHTML = "";
+      matchs.forEach((match, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td data-label="Sélect"><input type="checkbox" onchange="toggleSelection(${index}, this.checked)"></td>
+          <td data-label="Domicile">${match.equipe_dom}</td>
+          <td data-label="Extérieur">${match.equipe_ext}</td>
+          <td data-label="Lieu">${match.lieu}</td>
+          <td data-label="Action"><button onclick="lireMatch(${index})">Lire</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleSelection(index, checked) {
+      matchs[index].selectionne = checked;
     }
 
     function lireMatch(index) {
       const match = matchs[index];
       if (!match) return;
-      speechSynthesis.cancel(); // stop toute lecture en cours
-      document.getElementById("etat-lecture").innerText = `Lecture du match : ${match.equipe_dom} vs ${match.equipe_ext}`;
+      speechSynthesis.cancel();
+      document.getElementById("etat-lecture").innerText =
+        `Lecture du match : ${match.equipe_dom} vs ${match.equipe_ext}`;
       lireTexte(genererAnnonce(match), () => {
         document.getElementById("etat-lecture").innerText = "✅ Lecture terminée.";
       });
     }
   </script>
-
 </body>
 </html>
